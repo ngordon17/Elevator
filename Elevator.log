@@ -1,0 +1,44 @@
+#numFloors = 10 numElevators = 2 numRiders = 9 maxOccupancy = 2
+R2 pushes U0
+R1 pushes U0
+R3 pushes U0
+R4 pushes U0
+E0 moves down to F0
+E0 on F0 opens
+#ERROR: Can't read input format, must have id, source, target
+#R3 attempts to enter E0 on F0
+#R2 attempts to enter E0 on F0
+#R1 attempts to enter E0 on F0
+#R4 attempts to enter E0 on F0
+#E0 num occupants = 2 / 2
+#E0 num occupants = 2 / 2
+E0 on F0 closes
+#R3 fails to enter E0 on F0
+R3 pushes U0
+#R2 fails to enter E0 on F0
+R4 enters E0 on F0
+R4 pushes E0B5
+E0 moves up to F5
+R2 pushes U0
+E1 moves down to F0
+R1 enters E0 on F0
+E1 on F0 opens
+E0 on F5 opens
+R1 pushes E0B5
+#R2 attempts to enter E1 on F0
+#R3 attempts to enter E1 on F0
+#E1 num occupants = 1 / 2
+R3 enters E1 on F0
+R3 pushes E1B5
+#E1 num occupants = 2 / 2
+R2 enters E1 on F0
+R2 pushes E1B5
+E1 on F0 closes
+E1 moves up to F5
+E1 on F5 opens
+R2 exits E1 on F5
+R3 exits E1 on F5
+E1 on F5 closes
+R1 exits E0 on F5
+R4 exits E0 on F5
+E0 on F5 closes

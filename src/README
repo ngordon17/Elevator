@@ -1,0 +1,250 @@
+/**********************************************
+ * Please DO NOT MODIFY the format of this file
+ **********************************************/
+
+/*************************
+ * Team Info & Time spent
+ *************************/
+
+	Name1: Nick Gordon 	
+	NetId1: njg10	 	
+	Time spent: 15 hours 	// Edit 
+
+	Name2: Tori Reynolds 	
+	NetId2: vmr4	 	
+	Time spent: 15 hours 	// Edit 
+
+
+/******************
+ * Files to submit
+ ******************/
+
+	lab3.jar // An executable jar including all the source files and test cases.
+	README	// This file filled with the lab implementation details
+	Elevator.input // You can submit a sample input and log file
+       Elevator.log   // corresponding to the input but Elevator.log should be 
+		       // auto-generated on execution of jar file
+
+/************************
+ * Implementation details
+ *************************/
+
+/* 
+ * This section should contain the implementation details and a overview of the
+ * results. 
+
+ * You are required to provide a good README document including the
+ * implementation details. In particular, you can use pseudocode to describe
+ * your implementation details where necessary. However that does not mean to
+ * copy/paste your C code. Specifically, explain the synchronization primitives
+ * used in implementing the elevator, scheduling choices used, how the capacity
+ * constraint is handled, and how the multiple elevators are supported. Also,
+ * explain how to run the test cases for your EventBarrier and Elevator and how
+ * to interpret the results. Check the README.OUTPUTFORMAT for the acceptable
+ * input/output format for the elevator. Expect the design and implementation
+ * details to be at most 2-3 pages.  A plain textfile is encouraged. However, a
+ * pdf is acceptable.  No other forms are permitted.
+
+ * In case of lab is limited in some functionality, you should provide the
+ * details to maximize your partial credit.  
+ * */
+
+Synchronization:
+In order to handle the synchronization of our elevator riders and our elevators we used the event barrier class that we created in part 1 of this project. Our event barrier utilizes condition variables to synchronize our threads specifically threads wait on whether or not the gate is open or not (as in arrive()) or on the number of waiting threads (as in complete() and raise()). Please note that we added a timer to our event barrier in raise() in order to deal with misbehaving riders in the extra credit (i.e. those that call an elevator and then do not wait for it - we will talk about this more later.
+Moreover, in order to deal with rider threads reading in input we created a Scanner in building which is shared among all rider threads. In order to deal with this we implemented some other synchronized blocks in the rider threads to handle this shared resource. 
+
+Scheduling Choices:
+To begin, a rider thread enters a building and calls either CallUp() or CallDown(). Here we assign the closest elevator to pick up this rider. In order to calculate the closest elevator we used a function called findEffectiveDistance(). Essentially this calculates how many floors an elevator would need to pass in order to get to the rider's floor and go in the correct direction. For example, if a rider is on floor 3 and calls the elevator going up, and elevator 1 is on floor 5 going down, then elevator one would need to go down to floor 0, then up to floor 3 to pick up the rider, so its effective distance is eight. 
+To handle the order in which elevators drop off/pick up riders we implemented the C-Scan algorithm that was talked about in class. Essentially, if the elevator is on floor 0 going up, then it goes up to each floor where there is a request for pick up until it gets to the highest floor with a request for that elevator and then does the same process going down. If there are no requests the elevator simply stays at its current floor. We found that this was the best way to avoid rider starvation or deadlock.
+Moreover, in order to make it easier for the elevator to know whether a rider is going up or down we implemented two event barriers per floor per elevator. One which keeps track of requests to get on/off the elevator at a floor while it is going up and the other for when it is going down.
+
+Capacity Constraint: 
+In order to deal with the capacity constraint for the elevators we added a private instance variable (numOccupants) which keeps track of the number of riders that are currently in the elevator. If a rider is trying to get onto a an elevator that is currently full then when it calls enter(), enter() will return false and such the rider knows to call complete() on the event barrier, but then requests a new elevator to come pick him/her up.
+
+Multiple Elevators Support:
+See scheduling choices for how an elevator is assigned to a request, etc...
+
+Test Cases: 
+In order to test our program we provided an ElevatorRider class as well as an ElevatorTester class. ElevatorTester begins by creating a scanner to read an input file called "input.txt" and also an object to write output to a file called "Elevator.log" (please note that after you run the program you must refresh the project file in order to see the updated Elevator.log file). The output/input file follows the specifications for output/input format outlined in the lab - there are a few extra lines that are printed, however, those begin with a "#." Next, the tester class reads in numFloors, numElevators, numRider, and maxOccupancy and instantiates a building (note that we modified the constructor for this class to include maxOccupancy as a parameter - elevators are created within the building class and so this was necessary in order to pass this parameter to the elevators). Lastly, in the constructor rider threads are created and started.												
+	for (int i = 0; i < numRiders; i++) {
+			//BadlyBehavedElevatorRider rider = new 		  				BadlyBehavedElevatorRider(building, in);
+			ElevatorRider rider = new ElevatorRider(building, in);
+			Thread thr = new Thread(rider);
+			thr.start();
+		}
+
+Note that ElevatorRider and Elevator implements Runnable so in order for them to run you have to pass them to Thread(). 
+
+In ElevatorRider each rider begins running in a while loop which checks if the Scanner has a next line of input, if it does then it continues, otherwise it ceases to run. Note, that we wrote a separate function hasNextLine() which is static and synchronized. This creates a lock on the ElevatorRider.class and avoids multithreading errors in this line. 
+Next it reads in the necessary information to run, i.e. a source floor, target floor, and a rider ID. 
+
+The way the rider thread runs is by calling either CallUp() or CallDown() - which returns the closest elevator which is now assigned to the request, lets call it e, then e.enter(), then e.RequestFloor(targetFloor), then e.Exit(). Note that enter() is a boolean function, in order to handle the case where enter() returns false (i.e. the elevator is full) we do the following: 
+
+	while (!e.Enter()) {
+		//print statements here
+		e = myBuilding.CallUp(mySource);
+	}
+
+Note that complete() is called in enter, so we avoid having the elevator be stuck here since numWaiters would be > 0 counting this thread which called e.Enter() and got false as still waiting. 
+
+Here is some sample input/output:
+
+Input:
+10 2 9 2
+1 0 5 
+2 0 5
+3 0 5
+4 0 5
+
+Output:
+#numFloors = 10 numElevators = 2 numRiders = 9 maxOccupancy = 2
+R1 pushes U0
+E0 moves down to F0
+E0 on F0 opens
+R2 pushes U0
+#R2 attempts to enter E0 on F0
+#R1 attempts to enter E0 on F0 //---- (we print this to help us see when enter fails)
+#E0 num occupants = 1 / 2  //---- (we print this to tell us whether elevator is full)
+R1 enters E0 on F0
+R1 pushes E0B5
+#E0 num occupants = 2 / 2
+R2 enters E0 on F0
+R2 pushes E0B5
+E0 on F0 closes
+E0 moves up to F5
+E0 on F5 opens
+R2 exits E0 on F5
+R1 exits E0 on F5
+R3 pushes U0
+E1 moves down to F0
+E1 on F0 opens
+R4 pushes U0
+E0 on F5 closes
+#R4 attempts to enter E1 on F0
+#R3 attempts to enter E1 on F0
+#E1 num occupants = 1 / 2
+R3 enters E1 on F0
+R3 pushes E1B5
+#E1 num occupants = 2 / 2
+R4 enters E1 on F0
+R4 pushes E1B5
+E1 on F0 closes
+E1 moves up to F5
+E1 on F5 opens
+R4 exits E1 on F5
+R3 exits E1 on F5
+#ERROR: Can't read input format, must have id, source, target //---- (if input is incorrect thread terminates, this occurs sometimes if you leave a blank line at the end of your "input.text)
+E1 on F5 closes
+
+
+Input: (taken from README.OUTPUTFORMAT example) - (NOTE: we made the bottom floor 0, not 1, so rather than 4 3 9 4 as first line, we did 5 3 9 5)
+5 3 9 5
+7 1 3
+3 4 2
+
+Output:
+#numFloors = 5 numElevators = 3 numRiders = 9 maxOccupancy = 5
+R7 pushes U1
+E0 moves up to F1
+E0 on F1 opens
+R3 pushes D4
+#R7 attempts to enter E0 on F1
+#E0 num occupants = 1 / 5
+R7 enters E0 on F1
+R7 pushes E0B3
+E0 on F1 closes
+E0 moves up to F3
+E0 on F3 opens
+R7 exits E0 on F3
+E0 on F3 closes
+E0 moves up to F4
+E0 on F4 opens
+#R3 attempts to enter E0 on F4
+#E0 num occupants = 1 / 5
+R3 enters E0 on F4
+R3 pushes E0B2
+E0 on F4 closes
+E0 moves down to F2
+E0 on F2 opens
+R3 exits E0 on F2
+E0 on F2 closes
+
+Extra Credit:
+In the lab assignment, we are told that we can receive extra credit by dealing with three special cases:
+1. Rider calls and enters elevator, but does not request a floor.
+In this case, the rider is never added to an event barrier for any floor since he does not request a floor, as such the rider will stay in the elevator until he requests a floor 
+2/3. Rider calls elevator but doesn't wait (i.e. never calls enter) or requests a floor and never gets out (i.e. never exits). 
+I put these in the same category, because our solution to solve them is the same. As I mentioned previously we put a timer in our event barrier in raise() - see below:
+
+@Override
+	public synchronized void raise() {
+		// TODO Auto-generated method stub
+		//numCompleted = 0;
+		gateOpened = true;
+		this.notifyAll();
+		
+		//timer is to deal with extra credit conditions...
+		myTimer = new Timer();
+		myTimer.schedule(new CloseDoorTask(this), 1000);
+		
+		while (numWaiters > 0) {
+			try {
+				wait();
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		myTimer.cancel();
+		gateOpened = false;
+	}
+
+In this case, we create a timer with a one second delay. As such, if raise does not return after one second (i.e. numWaiters > 0) after one second has passed, then the timer will go off and call CloseDoorTask.run() which calls forceClose() in event barrier, which is the following:
+
+	public synchronized void forceClose() {
+		numWaiters = 0;
+		System.out.println("#Time's up - doors being forced closed! " + 			numWaiters);
+		this.notifyAll();
+	}
+
+This sets numWaiters = 0 and then wakes up all waiting threads so that they may finish their complete() function and continue running. While the delay is arbitrary, theoretically, one second should be enough time for any riders to who want to exit/enter the elevator to do so, meaning that any waiters remaining after this one second should be the misbehaving riders. Since they do not wait for the elevator anymore we can ignore them and set numWaiters = 0 allowing other threads to cease blocking and continue running.
+
+Note, that to allow testing of this we created a BadlyBehavedRider class which does the same thing as the ElevatorRider class, except it only calls CallUp() without called enter(), requestFloor(), or exit(). In order to run this yourself simply go to the elevatorTester class and go to the end of the contractor where rider threads are created. Uncomment the line where BadlyBehavedRider object are instantiated and comment out the line where ElevatorRider objects are instantiated.
+Here is some sample output for this:
+
+Input:
+5 3 9 5
+1 2 3 
+
+Output:
+#numFloors = 5 numElevators = 3 numRiders = 9 maxOccupancy = 5
+BBR1 pushes U2
+E0 moves up to F2
+E0 on F2 opens
+BBR1 did not wait for elevator 0
+#Time's up - doors being forced closed! 0
+E0 on F2 closes
+
+
+
+/************************
+ * Feedback on the lab
+ ************************/
+
+/*
+ * Any comments/questions/suggestions/experiences that you would help us to
+ * improve the lab.
+ * */
+
+I thought this lab was fun, except I think that more guidance news to be given for testing our programs. With multi-threading it was very difficult for us to test our program and think through all the possible errors. It would've been nice if we were given a lot more sample input/output to makek sure our code runs properly. 
+
+/************************
+ * References
+ ************************/
+
+/*
+ * List of collaborators involved including any online references/citations.
+ * */
+
+UTAs: Becky DeNardis
